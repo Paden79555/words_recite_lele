@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#3978ff">
+  <title>深圳中考单词冲刺 · Vocab Quest</title>
+  <meta name="description" content="面向深圳中考学生的英语单词背诵与遗忘曲线复习网页，可部署到 GitHub Pages。">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <nav class="topbar" aria-label="主导航">
+        <div class="brand">
+          <span class="brand-mark">VQ</span>
+          <div>
+            <strong>深圳中考单词冲刺</strong>
+            <span>为英语薄弱学生设计的每日背诵游戏</span>
+          </div>
+        </div>
+        <div class="nav-actions">
+          <button class="tab-button is-active" data-view="learn">背诵</button>
+          <button class="tab-button" data-view="admin">看板</button>
+          <button class="tab-button" data-view="settings">设置</button>
+          <button class="tab-button" data-view="strategy">需求</button>
+        </div>
+      </nav>
+
+      <section class="hero-grid">
+        <div>
+          <p class="eyebrow">深圳中考 · 手机背单词</p>
+          <h1>今天只做一件事：把该复习的词记牢。</h1>
+          <p class="hero-copy">按掌握度、遗忘曲线和错误次数自动安排任务，适合在微信里每天碎片化打开。</p>
+          <div class="hero-actions">
+            <button class="primary-button" id="startSessionButton">开始今日任务</button>
+            <button class="secondary-button" data-view-jump="admin">查看进度</button>
+          </div>
+        </div>
+        <div class="hero-card">
+          <span class="ring-label">总掌握率</span>
+          <div class="progress-ring" id="masteryRing" style="--value: 0deg">
+            <div><strong id="masteryPercent">0%</strong><span>已掌握</span></div>
+          </div>
+          <div class="mini-stats">
+            <span><strong id="totalWordsCount">0</strong>中考核心词</span>
+            <span><strong id="dueWordsCount">0</strong>今日待复习</span>
+          </div>
+        </div>
+      </section>
+    </header>
+
+    <main>
+      <section id="learnView" class="view is-visible">
+        <div class="dashboard-grid">
+          <article class="panel span-2">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">今日任务</p>
+                <h2>背诵进度</h2>
+              </div>
+              <span class="pill" id="streakPill">连续 0 天</span>
+            </div>
+            <div class="progress-stack">
+              <div>
+                <div class="progress-title"><span>今日完成</span><strong id="dailyProgressText">0 / 0</strong></div>
+                <div class="progress-track"><div id="dailyProgressBar"></div></div>
+              </div>
+              <div>
+                <div class="progress-title"><span>总词库掌握</span><strong id="totalProgressText">0 / 0</strong></div>
+                <div class="progress-track total"><div id="totalProgressBar"></div></div>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel word-card span-2" id="wordCard">
+            <div class="word-meta">
+              <span class="badge" id="wordLevel">核心词</span>
+              <span id="wordStatus">准备开始</span>
+            </div>
+            <h2 id="wordText">点击开始今日背诵</h2>
+            <p class="phonetic" id="wordPhonetic">系统会优先抽取即将遗忘和薄弱单词</p>
+            <p class="meaning" id="wordMeaning">每张卡片先回忆，再看答案，最后按真实掌握情况选择。</p>
+            <div class="example" id="wordExample">建议每天 20～30 分钟，少量多次，比一次性刷完更稳。</div>
+            <div class="card-actions primary-actions">
+              <button class="secondary-button" id="showAnswerButton">显示释义</button>
+              <button class="danger-button" id="forgotButton">没记住</button>
+              <button class="success-button" id="knownButton">记住了</button>
+            </div>
+            <div class="quick-actions">
+              <button class="ghost-button" id="speakButton">读音</button>
+              <button class="ghost-button" id="skipButton">稍后</button>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header compact"><h3>今日奖励</h3><span class="pill gold" id="coinCount">0 金币</span></div>
+            <div class="quest-map" id="questMap"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header compact"><h3>遗忘曲线</h3><span class="pill">1·2·4·7·15</span></div>
+            <div class="curve-chart" id="curveChart"></div>
+            <p class="hint">红色越多代表越容易忘，系统会自动提前安排复习。</p>
+          </article>
+        </div>
+      </section>
+
+      <section id="adminView" class="view">
+        <div class="admin-grid">
+          <article class="panel metric-card"><span>总进度</span><strong id="adminTotalRate">0%</strong><p>目标：考前完成全部核心词掌握</p></article>
+          <article class="panel metric-card"><span>高风险词</span><strong id="adminRiskCount">0</strong><p>连续错误或到期未复习</p></article>
+          <article class="panel metric-card"><span>今日完成</span><strong id="adminDailyRate">0%</strong><p>建议保持 85% 以上</p></article>
+          <article class="panel metric-card"><span>学习金币</span><strong id="adminCoins">0</strong><p>用于强化正反馈</p></article>
+        </div>
+
+        <div class="dashboard-grid admin-panels">
+          <article class="panel span-2">
+            <div class="panel-header"><h2>掌握分布</h2><span class="pill">管理员视角</span></div>
+            <div class="bar-list" id="masteryDistribution"></div>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-header"><h2>薄弱单词清单</h2><span class="pill danger">优先干预</span></div>
+            <div class="word-table" id="riskWordTable"></div>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-header"><h2>7 天学习趋势</h2><span class="pill">完成量 / 错误量</span></div>
+            <div class="trend-chart" id="trendChart"></div>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-header"><h2>管理员建议</h2><span class="pill gold">PM 分析</span></div>
+            <ul class="recommendations" id="recommendations"></ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="settingsView" class="view">
+        <div class="dashboard-grid settings-grid">
+          <article class="panel span-2">
+            <div class="panel-header"><h2>学习设置</h2><span class="pill">手机端</span></div>
+            <label class="setting-row">
+              <span>每日目标</span>
+              <select id="dailyTargetSelect">
+                <option value="8">轻量 8 词</option>
+                <option value="12">标准 12 词</option>
+                <option value="18">冲刺 18 词</option>
+                <option value="24">强化 24 词</option>
+              </select>
+            </label>
+            <label class="setting-row">
+              <span>任务策略</span>
+              <select id="studyModeSelect">
+                <option value="balanced">复习 + 新词平衡</option>
+                <option value="weak">只优先错词薄弱词</option>
+                <option value="new">多学新词</option>
+              </select>
+            </label>
+            <div class="settings-actions">
+              <button class="primary-button" id="saveSettingsButton">保存设置</button>
+              <button class="secondary-button" id="exportReportButton">导出报告</button>
+              <button class="danger-button" id="resetDemoButton">重置数据</button>
+            </div>
+          </article>
+          <article class="panel span-2">
+            <div class="panel-header"><h2>功能完整度</h2><span class="pill gold">建议</span></div>
+            <ul class="recommendations">
+              <li>已具备：背诵、复习排程、遗忘曲线、进度、管理员看板、本地保存。</li>
+              <li>建议补齐完整中考词库后，再上线给学生长期使用。</li>
+              <li>如果多人使用，需要后端账号；当前版本更适合单人微信收藏打开。</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section id="strategyView" class="view">
+        <article class="panel strategy-panel">
+          <p class="eyebrow">产品经理视角</p>
+          <h2>需求调研与产品方案</h2>
+          <div class="strategy-grid">
+            <section>
+              <h3>目标用户</h3>
+              <p>深圳中考英语薄弱学生，单人使用；管理员可以是家长、老师或学生本人，用于查看进度和薄弱点。</p>
+            </section>
+            <section>
+              <h3>核心问题</h3>
+              <p>词汇量不足、重复背但忘得快、缺少即时反馈、家长不知道每天是否有效完成。</p>
+            </section>
+            <section>
+              <h3>关键指标</h3>
+              <p>每日完成率、总掌握率、复习准时率、薄弱词下降速度、连续学习天数。</p>
+            </section>
+            <section>
+              <h3>功能优先级</h3>
+              <p>P0：背诵卡片、遗忘曲线、进度条、管理员看板；P1：错词导出、词库导入；P2：听写和例句测验。</p>
+            </section>
+            <section>
+              <h3>游戏机制</h3>
+              <p>金币、连续天数、地图节点、掌握率圆环，用低成本正反馈降低坚持门槛。</p>
+            </section>
+            <section>
+              <h3>部署方案</h3>
+              <p>纯 HTML/CSS/JS 静态站点，学习数据保存在浏览器 localStorage，适合 GitHub Pages 免费托管。</p>
+            </section>
+          </div>
+        </article>
+      </section>
+    </main>
+    <nav class="bottom-nav" aria-label="手机底部导航">
+      <button class="bottom-tab is-active" data-view="learn"><span>背</span>背诵</button>
+      <button class="bottom-tab" data-view="admin"><span>图</span>看板</button>
+      <button class="bottom-tab" data-view="settings"><span>调</span>设置</button>
+      <button class="bottom-tab" data-view="strategy"><span>需</span>需求</button>
+    </nav>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
