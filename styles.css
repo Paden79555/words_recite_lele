@@ -97,14 +97,23 @@ h1 { margin-bottom: 10px; font-size: 28px; line-height: 1.16; letter-spacing: -0
 .today-ring strong, .today-ring span { position: relative; z-index: 1; }
 .today-ring strong { display: grid; place-items: center; width: 68px; height: 44px; margin-top: 12px; border-radius: 30px 30px 0 0; background: #fff; font-size: 24px; }
 .today-ring span { display: grid; place-items: center; width: 68px; height: 24px; border-radius: 0 0 30px 30px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 800; }
+.exam-countdown { display: inline-grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; margin-top: 12px; padding: 8px 10px; border-radius: 999px; background: rgba(255,255,255,0.18); font-size: 12px; font-weight: 900; }
+.exam-countdown strong { font-size: 18px; }
 
-.progress-card, .word-card, .panel, .admin-summary article {
+.progress-card, .rank-card, .word-card, .panel, .admin-summary article, .admin-grid article {
   border: 1px solid var(--line);
   border-radius: 26px;
   background: var(--card);
   box-shadow: 0 12px 30px rgba(39,63,119,0.08);
 }
-.progress-card { padding: 18px; }
+.progress-card, .rank-card { padding: 18px; }
+.rank-card { display: grid; gap: 10px; background: linear-gradient(135deg, #172349, #47349a); color: #fff; }
+.rank-card span, .rank-card small { color: rgba(255,255,255,0.72); font-weight: 900; }
+.rank-card strong { display: block; margin: 4px 0; font-size: 28px; }
+.rank-stars { color: rgba(255,255,255,0.34); letter-spacing: 4px; }
+.rank-stars .is-lit { color: var(--yellow); text-shadow: 0 0 14px rgba(255,181,69,0.45); }
+.rank-progress { overflow: hidden; height: 12px; border-radius: 999px; background: rgba(255,255,255,0.2); }
+.rank-progress div { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--yellow), #fff); transition: width 0.3s ease; }
 .progress-row { justify-content: space-between; margin-bottom: 10px; color: var(--muted); font-weight: 800; }
 .progress-row strong { color: var(--text); }
 .progress-track { overflow: hidden; height: 14px; border-radius: 999px; background: #eef2fb; }
@@ -188,16 +197,29 @@ h1 { margin-bottom: 10px; font-size: 28px; line-height: 1.16; letter-spacing: -0
 .trend-bar.done { background: linear-gradient(180deg, var(--green), #31cde1); }
 .trend-bar.wrong { background: linear-gradient(180deg, var(--red), #ffc3ca); }
 
+.admin-login, .admin-dashboard { display: grid; gap: 12px; }
+.login-card input { width: 100%; padding: 15px 16px; border: 0; border-radius: 18px; color: var(--text); background: #f6f8ff; font: inherit; }
+.security-note, .source-card p { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
 .admin-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .admin-summary article { padding: 14px; }
-.admin-summary span { color: var(--muted); font-size: 12px; font-weight: 900; }
+.admin-summary span, .admin-grid span { color: var(--muted); font-size: 12px; font-weight: 900; }
 .admin-summary strong { display: block; margin-top: 6px; font-size: 30px; }
+.admin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.admin-grid article { padding: 14px; box-shadow: none; }
+.admin-grid strong { display: block; margin-top: 6px; font-size: 22px; }
+.source-card strong { font-size: 18px; }
 .bar-list, .word-table { display: grid; gap: 12px; }
 .dist-row { display: grid; grid-template-columns: 76px 1fr 36px; align-items: center; gap: 10px; font-size: 14px; }
 .dist-track { overflow: hidden; height: 14px; border-radius: 999px; background: #eef2fb; }
 .dist-track div { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), var(--green)); }
 .word-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 12px; border-radius: 16px; background: #f7f9ff; font-size: 14px; }
 .recommendations { margin: 0; padding-left: 20px; color: var(--muted); line-height: 1.8; }
+.peak-card { display: grid; gap: 12px; }
+.peak-card p { margin-bottom: 0; color: var(--muted); line-height: 1.6; }
+.peak-word { padding: 18px; border-radius: 20px; background: linear-gradient(135deg, #fff8e9, #eef4ff); font-size: 18px; font-weight: 900; }
+.peak-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.peak-actions .primary-button { grid-column: 1 / -1; }
+.peak-history { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
 .setting-row { display: grid; gap: 10px; margin-bottom: 16px; color: var(--muted); font-weight: 900; }
 .settings-actions { display: grid; gap: 10px; }
 .strategy-panel { padding: 18px; }

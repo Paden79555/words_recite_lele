@@ -1,29 +1,41 @@
 const WORDS = window.WORDS || [];
 const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "样例全量", subtitle: "当前词库", maxIndex: 9999, source: "内置样例" }];
-const STORAGE_KEY = "shenzhen-vocab-quest-state-v2";
+const STORAGE_KEY = "shenzhen-vocab-quest-state-v3";
+const TARGET_TOTAL_WORDS = 2000;
+const EXAM_DATE = "2026-06-20";
+const ADMIN_USER = "panzeng";
+const ADMIN_PASS = "1241118913";
 const todayKey = new Date().toISOString().slice(0, 10);
 const intervals = [1, 2, 4, 7, 15];
+const rankTiers = [
+  { name: "倔强青铜", min: 0, max: 199 },
+  { name: "秩序白银", min: 200, max: 399 },
+  { name: "荣耀黄金", min: 400, max: 699 },
+  { name: "尊贵铂金", min: 700, max: 999 },
+  { name: "永恒钻石", min: 1000, max: 1299 },
+  { name: "至尊星耀", min: 1300, max: 1599 },
+  { name: "最强王者", min: 1600, max: 1899 },
+  { name: "荣耀王者", min: 1900, max: 2000 }
+];
 const el = (id) => document.getElementById(id);
 let state = loadState();
 let queue = buildQueue();
 let currentWordId = null;
 let answerVisible = false;
+let peakSession = null;
 let toastTimer;
 
 function loadState() {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-  if (saved && saved.words && saved.words.length === WORDS.length) {
-    saved.mode ||= "balanced";
-    saved.packId ||= "starter";
-    saved.coins ??= 0;
-    return saved;
-  }
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("shenzhen-vocab-quest-state-v2") || "null");
+  if (saved && saved.words && saved.words.length === WORDS.length) return upgradeState(saved);
 
-  return {
+  return upgradeState({
     coins: 0,
     streak: 1,
     mode: "balanced",
     packId: "starter",
+    peakScore: 1200,
+    peakRecords: [],
     lastStudyDate: todayKey,
     daily: seedDaily(),
     words: WORDS.map((_, index) => ({
@@ -36,7 +48,27 @@ function loadState() {
       reviewedToday: false,
       history: []
     }))
-  };
+  });
+}
+
+function upgradeState(saved) {
+  saved.mode ||= "balanced";
+  saved.packId ||= "starter";
+  saved.coins ??= 0;
+  saved.streak ||= 1;
+  saved.daily ||= seedDaily();
+  saved.peakScore ??= 1200;
+  saved.peakRecords ||= [];
+  saved.words.forEach((word) => {
+    word.history ||= [];
+    word.correct ??= 0;
+    word.wrong ??= 0;
+    word.score ??= 0;
+    word.intervalIndex ??= 0;
+    word.nextReview ||= todayKey;
+    word.reviewedToday ??= false;
+  });
+  return saved;
 }
 
 function seedDaily() {
@@ -107,6 +139,29 @@ function currentDailyDone() {
 
 function masteredWords() {
   return activeWordProgress().filter((word) => word.score >= 85).length;
+}
+
+function globalMasteredWords() {
+  return state.words.filter((word) => word.score >= 85).length;
+}
+
+function rankInfo() {
+  const mastered = globalMasteredWords();
+  const accuracyBase = state.words.reduce((sum, word) => sum + word.correct + word.wrong, 0);
+  const correct = state.words.reduce((sum, word) => sum + word.correct, 0);
+  const accuracy = accuracyBase ? Math.round(correct / accuracyBase * 100) : 0;
+  const adjusted = Math.min(TARGET_TOTAL_WORDS, mastered + Math.floor(Math.max(0, accuracy - 70) / 5) * 10 + Math.min(60, state.streak * 3));
+  const tier = rankTiers.find((item) => adjusted >= item.min && adjusted <= item.max) || rankTiers[rankTiers.length - 1];
+  const span = tier.max - tier.min + 1;
+  const progress = Math.min(100, Math.max(0, Math.round((adjusted - tier.min) / span * 100)));
+  const stars = Math.min(5, Math.max(1, Math.ceil(progress / 20)));
+  return { mastered, adjusted, accuracy, tier, progress, stars };
+}
+
+function examDaysLeft() {
+  const target = new Date(`${EXAM_DATE}T00:00:00`);
+  const today = new Date(`${todayKey}T00:00:00`);
+  return Math.max(0, Math.ceil((target - today) / 86400000));
 }
 
 function showNextWord() {
@@ -181,9 +236,12 @@ function gradeCurrent(known) {
 
 function renderAll() {
   renderProgress();
+  renderRank();
+  renderExam();
   renderPackLadder();
   renderQuestMap();
   renderCurve();
+  renderPeak();
   renderAdmin();
   renderSettings();
 }
@@ -194,7 +252,7 @@ function renderProgress() {
   const mastered = masteredWords();
   const dailyTarget = state.daily[todayKey].target;
   const dailyDone = Math.min(currentDailyDone(), dailyTarget);
-  const masteryRate = Math.round((mastered / total) * 100);
+  const masteryRate = total ? Math.round((mastered / total) * 100) : 0;
 
   el("masteryPercent").textContent = `${masteryRate}%`;
   el("masteryRing").style.setProperty("--value", `${masteryRate * 3.6}deg`);
@@ -206,6 +264,23 @@ function renderProgress() {
   el("coinCount").textContent = `${state.coins} 金币`;
   el("activePackName").textContent = `${pack.name} · ${pack.subtitle}`;
   el("packSourcePill").textContent = pack.id === "full-sample" ? "非官方样例" : "分级样例";
+}
+
+function renderRank() {
+  const info = rankInfo();
+  el("rankName").textContent = info.tier.name;
+  el("rankHint").textContent = `掌握 ${info.mastered} / ${TARGET_TOTAL_WORDS} 词 · 准确率 ${info.accuracy}%`;
+  el("rankStars").innerHTML = Array.from({ length: 5 }, (_, index) => `<span class="${index < info.stars ? "is-lit" : ""}">★</span>`).join("");
+  el("rankProgressBar").style.width = `${info.progress}%`;
+}
+
+function renderExam() {
+  const days = examDaysLeft();
+  const imported = WORDS.length;
+  el("examDaysLeft").textContent = `${days}天`;
+  el("examPressureText").textContent = days <= 30
+    ? `冲刺期：先保高频核心，当前仅导入 ${imported}/${TARGET_TOTAL_WORDS} 目标词`
+    : `距 2026 深圳中考约 ${days} 天，时间以官方公布为准`;
 }
 
 function renderPackLadder() {
@@ -250,17 +325,33 @@ function renderCurve() {
 }
 
 function renderAdmin() {
+  const unlocked = sessionStorage.getItem("vocab-admin-ok") === "1";
+  el("adminLoginPanel").style.display = unlocked ? "none" : "grid";
+  el("adminDashboardPanel").style.display = unlocked ? "grid" : "none";
+  if (!unlocked) return;
+
   const progress = activeWordProgress();
   const total = progress.length;
   const mastered = masteredWords();
   const dailyTarget = state.daily[todayKey].target;
   const dailyDone = Math.min(currentDailyDone(), dailyTarget);
   const riskWords = progress.filter((word) => riskScore(word) >= 92);
+  const info = rankInfo();
+  const bestPeak = Math.max(state.peakScore, ...state.peakRecords.map((record) => record.score));
 
-  el("adminTotalRate").textContent = `${Math.round(mastered / total * 100)}%`;
+  el("adminTotalRate").textContent = `${Math.round(globalMasteredWords() / TARGET_TOTAL_WORDS * 100)}%`;
   el("adminRiskCount").textContent = riskWords.length;
   el("adminDailyRate").textContent = `${Math.round(dailyDone / dailyTarget * 100)}%`;
-  el("adminCoins").textContent = state.coins;
+  el("adminPeakBest").textContent = bestPeak;
+  el("adminRankName").textContent = info.tier.name;
+  el("adminRankGrid").innerHTML = [
+    ["已掌握", `${info.mastered}/${TARGET_TOTAL_WORDS}`],
+    ["排位战力", info.adjusted],
+    ["综合准确率", `${info.accuracy}%`],
+    ["连续学习", `${state.streak} 天`],
+    ["距考试", `${examDaysLeft()} 天`],
+    ["当前导入", `${WORDS.length} 词`]
+  ].map(([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`).join("");
 
   const groups = [
     ["已掌握", progress.filter((word) => word.score >= 85).length],
@@ -280,7 +371,18 @@ function renderAdmin() {
     .join("") || "<p class='recommendations'>当前没有高风险词，保持节奏。</p>";
 
   renderTrend();
+  renderAdminPeakRecords();
+  renderSourceStatus();
   renderRecommendations(riskWords.length, dailyDone, dailyTarget);
+}
+
+function renderAdminPeakRecords() {
+  el("adminPeakRecords").innerHTML = state.peakRecords.slice(0, 8).map((record) => `<div class="word-row"><strong>${record.date}</strong><span>${record.score}分</span><span>${record.correct}/10</span></div>`).join("") || "<p class='recommendations'>暂无巅峰赛记录。</p>";
+}
+
+function renderSourceStatus() {
+  const ratio = Math.round(WORDS.length / TARGET_TOTAL_WORDS * 100);
+  el("sourceStatus").innerHTML = `<strong>已导入 ${WORDS.length} / ${TARGET_TOTAL_WORDS} 目标词（${ratio}%）</strong><p>公开搜索未核验到深圳官方完整 2k 词表；当前词库只能作为结构样例。建议后续导入学校、教材或考试说明中可追溯来源的 CSV。</p>`;
 }
 
 function renderTrend() {
@@ -292,13 +394,71 @@ function renderTrend() {
 }
 
 function renderRecommendations(riskCount, dailyDone, dailyTarget) {
+  const days = examDaysLeft();
+  const info = rankInfo();
   const items = [
     riskCount > 8 ? "明天不要加新词，先把高风险词复习两轮。" : "风险词数量可控，按今日任务继续即可。",
     dailyDone < dailyTarget ? "今天还没完成，建议拆成两次各 8 分钟。" : "今日任务完成，睡前只扫薄弱词。",
-    "家长每周只看总掌握、连续天数和高风险词数量。",
-    "上线前需导入完整深圳中考词库，当前为高频样例词库。"
+    days <= 30 ? "已进入考前压力区，优先保证高频词正确率，不盲目扩词。" : "每周至少完成 2 次巅峰赛，检查是否只是眼熟。",
+    `当前段位 ${info.tier.name}，距离 2000 词目标还差 ${Math.max(0, TARGET_TOTAL_WORDS - info.mastered)} 词。`,
+    "上线前需导入有来源的完整深圳中考词库，当前仍是高频样例词库。"
   ];
   el("recommendations").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
+}
+
+function renderPeak() {
+  el("peakScorePill").textContent = `${state.peakScore} 分`;
+  if (peakSession) {
+    const word = WORDS[peakSession.ids[peakSession.index]];
+    el("peakWordBox").textContent = `第 ${peakSession.index + 1}/10 题：${word.word} ${word.phonetic}`;
+  } else {
+    const latest = state.peakRecords[0];
+    el("peakWordBox").textContent = latest ? `上局 ${latest.score} 分 · 正确 ${latest.correct}/10` : "完成今日任务后建议挑战一次";
+  }
+  el("peakHistory").innerHTML = state.peakRecords.slice(0, 3).map((record) => `<span>${record.date} · ${record.score} · ${record.correct}/10</span>`).join("") || "<span>暂无挑战记录</span>";
+}
+
+function startPeakChallenge() {
+  const pool = activeWordProgress().map((word) => word.id);
+  const ids = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
+  if (!ids.length) return showToast("当前词库为空");
+  peakSession = { ids, index: 0, correct: 0, wrong: 0, streak: 0, delta: 0 };
+  renderPeak();
+  showToast("巅峰赛开始，按真实情况作答");
+}
+
+function gradePeak(known) {
+  if (!peakSession) {
+    startPeakChallenge();
+    return;
+  }
+  const wordState = state.words[peakSession.ids[peakSession.index]];
+  if (known) {
+    peakSession.correct += 1;
+    peakSession.streak += 1;
+    peakSession.delta += 10 + Math.min(6, peakSession.streak * 2);
+    wordState.score = Math.min(100, wordState.score + 6);
+  } else {
+    peakSession.wrong += 1;
+    peakSession.streak = 0;
+    peakSession.delta -= 8;
+    wordState.wrong += 1;
+    wordState.score = Math.max(0, wordState.score - 10);
+    wordState.nextReview = todayKey;
+  }
+  peakSession.index += 1;
+  if (peakSession.index >= peakSession.ids.length) finishPeakChallenge();
+  saveState();
+  renderAll();
+}
+
+function finishPeakChallenge() {
+  const score = Math.max(800, state.peakScore + peakSession.delta);
+  state.peakScore = score;
+  state.peakRecords.unshift({ date: todayKey, score, correct: peakSession.correct, wrong: peakSession.wrong, delta: peakSession.delta });
+  state.peakRecords = state.peakRecords.slice(0, 30);
+  peakSession = null;
+  showToast(`巅峰赛结算 ${score} 分`);
 }
 
 function renderSettings() {
@@ -377,6 +537,18 @@ function switchView(view) {
   renderAll();
 }
 
+function loginAdmin() {
+  const username = el("adminUsername").value.trim();
+  const password = el("adminPassword").value;
+  if (username === ADMIN_USER && password === ADMIN_PASS) {
+    sessionStorage.setItem("vocab-admin-ok", "1");
+    renderAll();
+    showToast("管理员已登录");
+    return;
+  }
+  showToast("账号或密码错误");
+}
+
 function resetDemo() {
   localStorage.removeItem(STORAGE_KEY);
   state = loadState();
@@ -396,6 +568,10 @@ el("speakButton").addEventListener("click", speakCurrent);
 el("saveSettingsButton").addEventListener("click", saveSettings);
 el("exportReportButton").addEventListener("click", exportReport);
 el("resetDemoButton").addEventListener("click", resetDemo);
+el("startPeakButton").addEventListener("click", startPeakChallenge);
+el("peakKnownButton").addEventListener("click", () => gradePeak(true));
+el("peakWrongButton").addEventListener("click", () => gradePeak(false));
+el("adminLoginButton").addEventListener("click", loginAdmin);
 
 ensureToday();
 saveState();

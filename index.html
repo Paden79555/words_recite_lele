@@ -25,11 +25,18 @@
             <p class="eyebrow">今日任务</p>
             <h1>先复习快忘的，再学新词。</h1>
             <p id="todayAdvice">系统会按遗忘曲线安排今天最该背的词。</p>
+            <div class="exam-countdown"><strong id="examDaysLeft">--</strong><span id="examPressureText">以深圳市教育局最终公布时间为准</span></div>
           </div>
           <div class="today-ring" id="masteryRing" style="--value: 0deg">
             <strong id="masteryPercent">0%</strong>
             <span>总掌握</span>
           </div>
+        </section>
+
+        <section class="rank-card">
+          <div><span>排位赛段位</span><strong id="rankName">倔强青铜</strong><small id="rankHint">掌握 0 / 2000 词</small></div>
+          <div class="rank-stars" id="rankStars"></div>
+          <div class="rank-progress"><div id="rankProgressBar"></div></div>
         </section>
 
         <section class="progress-card">
@@ -78,15 +85,41 @@
             <div class="curve-chart" id="curveChart"></div>
           </article>
         </section>
+
+        <section class="peak-card panel">
+          <div class="panel-header"><h3>巅峰赛随机挑战</h3><span class="pill gold" id="peakScorePill">1200 分</span></div>
+          <p id="peakIntro">从当前词库随机抽 10 词，像排位补位一样检验真实掌握度。</p>
+          <div class="peak-word" id="peakWordBox">完成今日任务后建议挑战一次</div>
+          <div class="peak-actions">
+            <button class="primary-button" id="startPeakButton">开始巅峰赛</button>
+            <button class="danger-button" id="peakWrongButton">不认识</button>
+            <button class="success-button" id="peakKnownButton">认识</button>
+          </div>
+          <div class="peak-history" id="peakHistory"></div>
+        </section>
       </section>
 
       <section id="adminView" class="view">
+        <section class="admin-login" id="adminLoginPanel">
+          <article class="panel login-card">
+            <div class="panel-header"><h2>管理员登录</h2><span class="pill danger">本机校验</span></div>
+            <label class="setting-row"><span>账号</span><input id="adminUsername" autocomplete="username" placeholder="请输入账号"></label>
+            <label class="setting-row"><span>密码</span><input id="adminPassword" type="password" autocomplete="current-password" placeholder="请输入密码"></label>
+            <button class="primary-button full" id="adminLoginButton">进入看板</button>
+            <p class="security-note">静态网页只能做界面门禁，真正权限保护需要后端登录。</p>
+          </article>
+        </section>
+        <section class="admin-dashboard" id="adminDashboardPanel">
         <section class="admin-summary">
-          <article><span>总掌握</span><strong id="adminTotalRate">0%</strong></article>
+          <article><span>全量目标进度</span><strong id="adminTotalRate">0%</strong></article>
           <article><span>今日完成</span><strong id="adminDailyRate">0%</strong></article>
           <article><span>高风险词</span><strong id="adminRiskCount">0</strong></article>
-          <article><span>金币</span><strong id="adminCoins">0</strong></article>
+          <article><span>巅峰最高</span><strong id="adminPeakBest">1200</strong></article>
         </section>
+        <article class="panel admin-rank-panel">
+          <div class="panel-header"><h2>排位总览</h2><span class="pill" id="adminRankName">倔强青铜</span></div>
+          <div class="admin-grid" id="adminRankGrid"></div>
+        </article>
         <article class="panel">
           <div class="panel-header"><h2>掌握分布</h2><span class="pill">家长看这里</span></div>
           <div class="bar-list" id="masteryDistribution"></div>
@@ -100,9 +133,18 @@
           <div class="trend-chart" id="trendChart"></div>
         </article>
         <article class="panel">
+          <div class="panel-header"><h2>巅峰赛记录</h2><span class="pill gold">随机测验</span></div>
+          <div class="word-table" id="adminPeakRecords"></div>
+        </article>
+        <article class="panel">
+          <div class="panel-header"><h2>词库完整性</h2><span class="pill danger">2000 目标</span></div>
+          <div class="source-card" id="sourceStatus"></div>
+        </article>
+        <article class="panel">
           <div class="panel-header"><h2>下一步建议</h2><span class="pill gold">PM 建议</span></div>
           <ul class="recommendations" id="recommendations"></ul>
         </article>
+        </section>
       </section>
 
       <section id="settingsView" class="view">
