@@ -1,7 +1,7 @@
 window.WORD_PACKS = [
   { id: "starter", name: "高频核心", subtitle: "先拿基础分", maxIndex: 72, source: "内置中考高频样例，待替换为核验来源" },
   { id: "middle", name: "中频扩展", subtitle: "补阅读和写作", maxIndex: 156, source: "内置中考高频样例，待替换为核验来源" },
-  { id: "full-sample", name: "样例全量", subtitle: "当前 234 词冲刺", maxIndex: 9999, source: "非官方完整词库，仅作结构与学习流程样例" }
+  { id: "full-sample", name: "当前样例库", subtitle: "已导入 234 / 目标 2000", maxIndex: 9999, source: "非官方完整词库；仅作结构与学习流程样例" }
 ];
 
 window.WORDS = [

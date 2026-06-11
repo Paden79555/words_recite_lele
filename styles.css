@@ -121,6 +121,7 @@ h1 { margin-bottom: 10px; font-size: 28px; line-height: 1.16; letter-spacing: -0
 .mini-kpis { justify-content: space-between; margin-top: 14px; color: var(--muted); font-size: 13px; }
 .mini-kpis span { display: grid; gap: 2px; text-align: center; }
 .mini-kpis strong { color: var(--text); font-size: 20px; }
+.source-mini { margin-top: 12px; padding: 10px 12px; border-radius: 16px; color: #9a6500; background: #fff6df; font-size: 12px; font-weight: 900; line-height: 1.4; }
 
 .word-card { padding: 16px; }
 .word-meta { justify-content: space-between; color: var(--muted); font-size: 13px; font-weight: 800; }
@@ -199,7 +200,7 @@ h1 { margin-bottom: 10px; font-size: 28px; line-height: 1.16; letter-spacing: -0
 
 .admin-login, .admin-dashboard { display: grid; gap: 12px; }
 .login-card input { width: 100%; padding: 15px 16px; border: 0; border-radius: 18px; color: var(--text); background: #f6f8ff; font: inherit; }
-.security-note, .source-card p { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
+.security-note, .source-card p, .import-panel p { margin: 10px 0 0; color: var(--muted); line-height: 1.6; }
 .admin-summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .admin-summary article { padding: 14px; }
 .admin-summary span, .admin-grid span { color: var(--muted); font-size: 12px; font-weight: 900; }
@@ -208,6 +209,8 @@ h1 { margin-bottom: 10px; font-size: 28px; line-height: 1.16; letter-spacing: -0
 .admin-grid article { padding: 14px; box-shadow: none; }
 .admin-grid strong { display: block; margin-top: 6px; font-size: 22px; }
 .source-card strong { font-size: 18px; }
+.import-format { display: grid; gap: 8px; margin-top: 12px; }
+.import-format span { padding: 10px 12px; border-radius: 14px; color: var(--blue); background: var(--blue-soft); font-size: 12px; font-weight: 900; line-height: 1.45; }
 .bar-list, .word-table { display: grid; gap: 12px; }
 .dist-row { display: grid; grid-template-columns: 76px 1fr 36px; align-items: center; gap: 10px; font-size: 14px; }
 .dist-track { overflow: hidden; height: 14px; border-radius: 999px; background: #eef2fb; }

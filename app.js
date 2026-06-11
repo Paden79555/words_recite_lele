@@ -1,5 +1,5 @@
 const WORDS = window.WORDS || [];
-const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "样例全量", subtitle: "当前词库", maxIndex: 9999, source: "内置样例" }];
+const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "当前样例库", subtitle: "已导入词库", maxIndex: 9999, source: "内置样例" }];
 const STORAGE_KEY = "shenzhen-vocab-quest-state-v3";
 const TARGET_TOTAL_WORDS = 2000;
 const EXAM_DATE = "2026-06-20";
@@ -263,7 +263,8 @@ function renderProgress() {
   el("dailyProgressBar").style.width = `${Math.min(100, dailyDone / dailyTarget * 100)}%`;
   el("coinCount").textContent = `${state.coins} 金币`;
   el("activePackName").textContent = `${pack.name} · ${pack.subtitle}`;
-  el("packSourcePill").textContent = pack.id === "full-sample" ? "非官方样例" : "分级样例";
+  el("packSourcePill").textContent = pack.id === "full-sample" ? "当前样例库" : "分级样例";
+  el("sourceMini").textContent = `目标 ${TARGET_TOTAL_WORDS} 词 · 已导入 ${WORDS.length} 词 · 缺口 ${Math.max(0, TARGET_TOTAL_WORDS - WORDS.length)} 词`;
 }
 
 function renderRank() {
@@ -373,6 +374,7 @@ function renderAdmin() {
   renderTrend();
   renderAdminPeakRecords();
   renderSourceStatus();
+  renderImportGuide();
   renderRecommendations(riskWords.length, dailyDone, dailyTarget);
 }
 
@@ -382,7 +384,21 @@ function renderAdminPeakRecords() {
 
 function renderSourceStatus() {
   const ratio = Math.round(WORDS.length / TARGET_TOTAL_WORDS * 100);
-  el("sourceStatus").innerHTML = `<strong>已导入 ${WORDS.length} / ${TARGET_TOTAL_WORDS} 目标词（${ratio}%）</strong><p>公开搜索未核验到深圳官方完整 2k 词表；当前词库只能作为结构样例。建议后续导入学校、教材或考试说明中可追溯来源的 CSV。</p>`;
+  el("sourceStatus").innerHTML = `<strong>已导入 ${WORDS.length} / ${TARGET_TOTAL_WORDS} 目标词（${ratio}%）</strong><p>deep-research 未发现可核验的深圳官方/半官方完整 2k 词表；当前词库只能作为样例库。建议后续导入学校、教材或考试说明中可追溯来源的词表。</p>`;
+}
+
+function renderImportGuide() {
+  el("importFormat").innerHTML = [
+    "字段：word / phonetic / meaning / example / level",
+    "来源：学校清单、教材目录、考试说明或明确授权词库",
+    "方法：整理后替换 words.js 中的 window.WORDS，并同步 WORD_PACKS 分段"
+  ].map((item) => `<span>${item}</span>`).join("");
+}
+
+function copyImportTemplate() {
+  const template = `{ word: "example", phonetic: "/ɪɡˈzɑːmpəl/", meaning: "例子", example: "This is an example.", level: "来源：学校核验" },`;
+  navigator.clipboard?.writeText(template);
+  showToast("已复制 words.js 单词模板");
 }
 
 function renderTrend() {
@@ -572,6 +588,7 @@ el("startPeakButton").addEventListener("click", startPeakChallenge);
 el("peakKnownButton").addEventListener("click", () => gradePeak(true));
 el("peakWrongButton").addEventListener("click", () => gradePeak(false));
 el("adminLoginButton").addEventListener("click", loginAdmin);
+el("copyTemplateButton").addEventListener("click", copyImportTemplate);
 
 ensureToday();
 saveState();
