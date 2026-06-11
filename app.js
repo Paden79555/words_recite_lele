@@ -1,7 +1,7 @@
 const WORDS = window.WORDS || [];
-const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "当前样例库", subtitle: "已导入词库", maxIndex: 9999, source: "内置样例" }];
+const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "教材完整库", subtitle: "已导入词库", maxIndex: 9999, source: "内置词库" }];
 const STORAGE_KEY = "shenzhen-vocab-quest-state-v3";
-const TARGET_TOTAL_WORDS = 2000;
+const TARGET_TOTAL_WORDS = WORDS.length;
 const EXAM_DATE = "2026-06-20";
 const ADMIN_USER = "panzeng";
 const ADMIN_PASS = "1241118913";
@@ -15,7 +15,7 @@ const rankTiers = [
   { name: "永恒钻石", min: 1000, max: 1299 },
   { name: "至尊星耀", min: 1300, max: 1599 },
   { name: "最强王者", min: 1600, max: 1899 },
-  { name: "荣耀王者", min: 1900, max: 2000 }
+  { name: "荣耀王者", min: 1300, max: 9999 }
 ];
 const el = (id) => document.getElementById(id);
 let state = loadState();
@@ -186,7 +186,7 @@ function showNextWord() {
   el("wordLevel").textContent = word.level;
   el("wordStatus").textContent = `掌握 ${progress.score}% · 错 ${progress.wrong} 次`;
   el("wordText").textContent = word.word;
-  el("wordPhonetic").textContent = word.phonetic;
+  el("wordPhonetic").textContent = word.phonetic || "音标未提供";
   el("wordMeaning").textContent = "先遮住中文，在心里回忆 3 秒。";
   el("wordExample").textContent = "想不起也没关系，点“看答案”后诚实选择。";
   el("todayAdvice").textContent = progress.wrong > 0 ? "这张是薄弱词，今天优先补上。" : "先回忆，再确认答案。";
@@ -263,8 +263,8 @@ function renderProgress() {
   el("dailyProgressBar").style.width = `${Math.min(100, dailyDone / dailyTarget * 100)}%`;
   el("coinCount").textContent = `${state.coins} 金币`;
   el("activePackName").textContent = `${pack.name} · ${pack.subtitle}`;
-  el("packSourcePill").textContent = pack.id === "full-sample" ? "当前样例库" : "分级样例";
-  el("sourceMini").textContent = `目标 ${TARGET_TOTAL_WORDS} 词 · 已导入 ${WORDS.length} 词 · 缺口 ${Math.max(0, TARGET_TOTAL_WORDS - WORDS.length)} 词`;
+  el("packSourcePill").textContent = pack.id === "full-sample" ? "教材完整库" : "分级词库";
+  el("sourceMini").textContent = `教材词表已导入 ${WORDS.length} 词/短语 · 来源：用户提供深圳中考初中词表`;
 }
 
 function renderRank() {
@@ -280,7 +280,7 @@ function renderExam() {
   const imported = WORDS.length;
   el("examDaysLeft").textContent = `${days}天`;
   el("examPressureText").textContent = days <= 30
-    ? `冲刺期：先保高频核心，当前仅导入 ${imported}/${TARGET_TOTAL_WORDS} 目标词`
+    ? `冲刺期：先保七上/高频核心，已导入 ${imported} 个教材词/短语`
     : `距 2026 深圳中考约 ${days} 天，时间以官方公布为准`;
 }
 
@@ -383,8 +383,7 @@ function renderAdminPeakRecords() {
 }
 
 function renderSourceStatus() {
-  const ratio = Math.round(WORDS.length / TARGET_TOTAL_WORDS * 100);
-  el("sourceStatus").innerHTML = `<strong>已导入 ${WORDS.length} / ${TARGET_TOTAL_WORDS} 目标词（${ratio}%）</strong><p>deep-research 未发现可核验的深圳官方/半官方完整 2k 词表；当前词库只能作为样例库。建议后续导入学校、教材或考试说明中可追溯来源的词表。</p>`;
+  el("sourceStatus").innerHTML = `<strong>已导入 ${WORDS.length} 个教材词/短语</strong><p>来源为用户提供的《深圳中考英语初中单词汇总(含音标)》文本；已按七上到九下、Unit 分组导入。音标缺失不影响背诵，后续可继续校对释义和补充例句。</p>`;
 }
 
 function renderImportGuide() {
@@ -416,8 +415,8 @@ function renderRecommendations(riskCount, dailyDone, dailyTarget) {
     riskCount > 8 ? "明天不要加新词，先把高风险词复习两轮。" : "风险词数量可控，按今日任务继续即可。",
     dailyDone < dailyTarget ? "今天还没完成，建议拆成两次各 8 分钟。" : "今日任务完成，睡前只扫薄弱词。",
     days <= 30 ? "已进入考前压力区，优先保证高频词正确率，不盲目扩词。" : "每周至少完成 2 次巅峰赛，检查是否只是眼熟。",
-    `当前段位 ${info.tier.name}，距离 2000 词目标还差 ${Math.max(0, TARGET_TOTAL_WORDS - info.mastered)} 词。`,
-    "上线前需导入有来源的完整深圳中考词库，当前仍是高频样例词库。"
+    `当前段位 ${info.tier.name}，本教材词表还剩 ${Math.max(0, TARGET_TOTAL_WORDS - info.mastered)} 词/短语未掌握。`,
+    "词库已按用户提供的深圳中考初中词表导入，建议后续逐单元校对音标和例句。"
   ];
   el("recommendations").innerHTML = items.map((item) => `<li>${item}</li>`).join("");
 }
@@ -426,7 +425,7 @@ function renderPeak() {
   el("peakScorePill").textContent = `${state.peakScore} 分`;
   if (peakSession) {
     const word = WORDS[peakSession.ids[peakSession.index]];
-    el("peakWordBox").textContent = `第 ${peakSession.index + 1}/10 题：${word.word} ${word.phonetic}`;
+    el("peakWordBox").textContent = `第 ${peakSession.index + 1}/10 题：${word.word} ${word.phonetic || ""}`;
   } else {
     const latest = state.peakRecords[0];
     el("peakWordBox").textContent = latest ? `上局 ${latest.score} 分 · 正确 ${latest.correct}/10` : "完成今日任务后建议挑战一次";
