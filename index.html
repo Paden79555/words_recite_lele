@@ -34,14 +34,19 @@
 
         <section class="progress-card">
           <div class="progress-row">
-            <span>今日完成</span><strong id="dailyProgressText">0 / 0</strong>
+            <span id="activePackName">当前词库</span><strong id="dailyProgressText">0 / 0</strong>
           </div>
           <div class="progress-track"><div id="dailyProgressBar"></div></div>
           <div class="mini-kpis">
             <span><strong id="dueWordsCount">0</strong>待复习</span>
-            <span><strong id="totalWordsCount">0</strong>词库</span>
+            <span><strong id="totalWordsCount">0</strong>当前词库</span>
             <span><strong id="streakPill">0</strong>连续天</span>
           </div>
+        </section>
+
+        <section class="panel compact-panel">
+          <div class="panel-header"><h3>词库闯关</h3><span class="pill" id="packSourcePill">来源说明</span></div>
+          <div class="pack-ladder" id="packLadder"></div>
         </section>
 
         <article class="word-card" id="wordCard">
@@ -103,13 +108,14 @@
       <section id="settingsView" class="view">
         <article class="panel">
           <div class="panel-header"><h2>学习设置</h2><span class="pill">单人本机</span></div>
+          <label class="setting-row"><span>词库范围</span><select id="wordPackSelect"><option value="starter">高频核心 · 先拿分</option><option value="middle">中频扩展 · 补阅读</option><option value="full-sample">样例全量 · 冲刺版</option></select></label>
           <label class="setting-row"><span>每日目标</span><select id="dailyTargetSelect"><option value="8">轻量 8 词</option><option value="12">标准 12 词</option><option value="18">冲刺 18 词</option><option value="24">强化 24 词</option></select></label>
           <label class="setting-row"><span>任务策略</span><select id="studyModeSelect"><option value="balanced">复习 + 新词平衡</option><option value="weak">只优先错词薄弱词</option><option value="new">多学新词</option></select></label>
           <div class="settings-actions"><button class="primary-button" id="saveSettingsButton">保存设置</button><button class="secondary-button" id="exportReportButton">导出报告</button><button class="danger-button" id="resetDemoButton">重置数据</button></div>
         </article>
         <article class="panel">
           <div class="panel-header"><h2>上线前自检</h2><span class="pill danger">重要</span></div>
-          <ul class="recommendations"><li>当前词库是中考高频样例，已经扩充但仍不是官方完整词库。</li><li>单人本机使用没问题；跨设备同步需要登录和后端。</li><li>微信收藏打开可用，建议家长每周导出一次报告备份。</li></ul>
+          <ul class="recommendations"><li>当前内置词库是公开范围未核验前的中考高频样例，不标注为官方完整词库。</li><li>已按“高频核心 / 中频扩展 / 样例全量”分级，后续可替换为有来源的深圳中考范围词库。</li><li>单人本机使用没问题；跨设备同步需要登录和后端。</li></ul>
         </article>
       </section>
 

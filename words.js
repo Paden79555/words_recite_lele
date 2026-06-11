@@ -1,3 +1,9 @@
+window.WORD_PACKS = [
+  { id: "starter", name: "高频核心", subtitle: "先拿基础分", maxIndex: 72, source: "内置中考高频样例，待替换为核验来源" },
+  { id: "middle", name: "中频扩展", subtitle: "补阅读和写作", maxIndex: 156, source: "内置中考高频样例，待替换为核验来源" },
+  { id: "full-sample", name: "样例全量", subtitle: "当前 234 词冲刺", maxIndex: 9999, source: "非官方完整词库，仅作结构与学习流程样例" }
+];
+
 window.WORDS = [
   { word: "ability", phonetic: "/əˈbɪləti/", meaning: "能力", example: "Practice improves your ability.", level: "核心名词" },
   { word: "able", phonetic: "/ˈeɪbl/", meaning: "能够的", example: "I am able to remember this word.", level: "核心形容词" },

@@ -1,4 +1,5 @@
 const WORDS = window.WORDS || [];
+const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "样例全量", subtitle: "当前词库", maxIndex: 9999, source: "内置样例" }];
 const STORAGE_KEY = "shenzhen-vocab-quest-state-v2";
 const todayKey = new Date().toISOString().slice(0, 10);
 const intervals = [1, 2, 4, 7, 15];
@@ -13,6 +14,7 @@ function loadState() {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
   if (saved && saved.words && saved.words.length === WORDS.length) {
     saved.mode ||= "balanced";
+    saved.packId ||= "starter";
     saved.coins ??= 0;
     return saved;
   }
@@ -21,6 +23,7 @@ function loadState() {
     coins: 0,
     streak: 1,
     mode: "balanced",
+    packId: "starter",
     lastStudyDate: todayKey,
     daily: seedDaily(),
     words: WORDS.map((_, index) => ({
@@ -64,9 +67,18 @@ function ensureToday() {
   }
 }
 
+function activePack() {
+  return WORD_PACKS.find((pack) => pack.id === state.packId) || WORD_PACKS[0];
+}
+
+function activeWordProgress() {
+  const pack = activePack();
+  return state.words.filter((word) => word.id < Math.min(pack.maxIndex, WORDS.length));
+}
+
 function buildQueue() {
   ensureToday();
-  const candidates = state.words.filter((word) => {
+  const candidates = activeWordProgress().filter((word) => {
     if (state.mode === "weak") return word.nextReview <= todayKey || word.score < 60 || word.wrong > 0;
     if (state.mode === "new") return !word.reviewedToday || word.nextReview <= todayKey;
     return word.nextReview <= todayKey || word.score < 70 || !word.reviewedToday;
@@ -90,11 +102,11 @@ function queueScore(word) {
 }
 
 function currentDailyDone() {
-  return state.words.filter((word) => word.reviewedToday).length;
+  return activeWordProgress().filter((word) => word.reviewedToday).length;
 }
 
 function masteredWords() {
-  return state.words.filter((word) => word.score >= 85).length;
+  return activeWordProgress().filter((word) => word.score >= 85).length;
 }
 
 function showNextWord() {
@@ -169,6 +181,7 @@ function gradeCurrent(known) {
 
 function renderAll() {
   renderProgress();
+  renderPackLadder();
   renderQuestMap();
   renderCurve();
   renderAdmin();
@@ -176,7 +189,8 @@ function renderAll() {
 }
 
 function renderProgress() {
-  const total = WORDS.length;
+  const pack = activePack();
+  const total = activeWordProgress().length;
   const mastered = masteredWords();
   const dailyTarget = state.daily[todayKey].target;
   const dailyDone = Math.min(currentDailyDone(), dailyTarget);
@@ -190,6 +204,28 @@ function renderProgress() {
   el("dailyProgressText").textContent = `${dailyDone} / ${dailyTarget}`;
   el("dailyProgressBar").style.width = `${Math.min(100, dailyDone / dailyTarget * 100)}%`;
   el("coinCount").textContent = `${state.coins} 金币`;
+  el("activePackName").textContent = `${pack.name} · ${pack.subtitle}`;
+  el("packSourcePill").textContent = pack.id === "full-sample" ? "非官方样例" : "分级样例";
+}
+
+function renderPackLadder() {
+  el("packLadder").innerHTML = WORD_PACKS.map((pack, index) => {
+    const words = state.words.filter((word) => word.id < Math.min(pack.maxIndex, WORDS.length));
+    const mastered = words.filter((word) => word.score >= 85).length;
+    const rate = words.length ? Math.round(mastered / words.length * 100) : 0;
+    const active = pack.id === state.packId ? "is-active" : "";
+    return `<button class="pack-card ${active}" data-pack-id="${pack.id}"><span>第${index + 1}关</span><strong>${pack.name}</strong><small>${pack.subtitle} · ${words.length}词 · ${rate}%</small></button>`;
+  }).join("");
+  document.querySelectorAll("[data-pack-id]").forEach((button) => button.addEventListener("click", () => changePack(button.dataset.packId)));
+}
+
+function changePack(packId) {
+  state.packId = packId;
+  queue = buildQueue();
+  currentWordId = null;
+  saveState();
+  renderAll();
+  showToast(`已切换到${activePack().name}`);
 }
 
 function renderQuestMap() {
@@ -202,9 +238,10 @@ function renderQuestMap() {
 }
 
 function renderCurve() {
+  const progress = activeWordProgress();
   const dueBuckets = intervals.map((days) => {
     const date = offsetDate(days);
-    return state.words.filter((word) => word.nextReview <= date).length;
+    return progress.filter((word) => word.nextReview <= date).length;
   });
   const max = Math.max(...dueBuckets, 1);
   el("curveChart").innerHTML = dueBuckets.map((count, index) => `
@@ -213,11 +250,12 @@ function renderCurve() {
 }
 
 function renderAdmin() {
-  const total = WORDS.length;
+  const progress = activeWordProgress();
+  const total = progress.length;
   const mastered = masteredWords();
   const dailyTarget = state.daily[todayKey].target;
   const dailyDone = Math.min(currentDailyDone(), dailyTarget);
-  const riskWords = state.words.filter((word) => riskScore(word) >= 92);
+  const riskWords = progress.filter((word) => riskScore(word) >= 92);
 
   el("adminTotalRate").textContent = `${Math.round(mastered / total * 100)}%`;
   el("adminRiskCount").textContent = riskWords.length;
@@ -225,10 +263,10 @@ function renderAdmin() {
   el("adminCoins").textContent = state.coins;
 
   const groups = [
-    ["已掌握", state.words.filter((word) => word.score >= 85).length],
-    ["较熟", state.words.filter((word) => word.score >= 60 && word.score < 85).length],
-    ["待补", state.words.filter((word) => word.score >= 30 && word.score < 60).length],
-    ["高危", state.words.filter((word) => word.score < 30).length]
+    ["已掌握", progress.filter((word) => word.score >= 85).length],
+    ["较熟", progress.filter((word) => word.score >= 60 && word.score < 85).length],
+    ["待补", progress.filter((word) => word.score >= 30 && word.score < 60).length],
+    ["高危", progress.filter((word) => word.score < 30).length]
   ];
 
   el("masteryDistribution").innerHTML = groups.map(([label, count]) => `
@@ -264,11 +302,13 @@ function renderRecommendations(riskCount, dailyDone, dailyTarget) {
 }
 
 function renderSettings() {
+  el("wordPackSelect").value = state.packId;
   el("dailyTargetSelect").value = String(state.daily[todayKey].target);
   el("studyModeSelect").value = state.mode;
 }
 
 function saveSettings() {
+  state.packId = el("wordPackSelect").value;
   state.daily[todayKey].target = Number(el("dailyTargetSelect").value);
   state.mode = el("studyModeSelect").value;
   queue = buildQueue();
@@ -304,10 +344,11 @@ function speakCurrent() {
 function exportReport() {
   const report = {
     date: todayKey,
-    totalWords: WORDS.length,
+    pack: activePack().name,
+    totalWords: activeWordProgress().length,
     mastered: masteredWords(),
     daily: state.daily[todayKey],
-    riskWords: state.words
+    riskWords: activeWordProgress()
       .filter((word) => riskScore(word) >= 92)
       .map((word) => ({ word: WORDS[word.id].word, score: word.score, wrong: word.wrong, nextReview: word.nextReview }))
   };
