@@ -24,6 +24,9 @@ let currentWordId = null;
 let answerVisible = false;
 let peakSession = null;
 let toastTimer;
+let selectedReviewUnit = "";
+let sessionStartedAt = Date.now();
+let lastDurationSync = Date.now();
 
 function loadState() {
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("shenzhen-vocab-quest-state-v2") || "null");
@@ -40,12 +43,14 @@ function loadState() {
     daily: seedDaily(),
     words: WORDS.map((_, index) => ({
       id: index,
-      score: index % 7 === 0 ? 70 : index % 5 === 0 ? 45 : 0,
+      score: 0,
       correct: 0,
-      wrong: index % 6 === 0 ? 1 : 0,
+      wrong: 0,
       intervalIndex: 0,
-      nextReview: index % 6 === 0 ? offsetDate(-1) : todayKey,
+      nextReview: todayKey,
       reviewedToday: false,
+      learned: false,
+      firstSeen: "",
       history: []
     }))
   });
@@ -57,8 +62,15 @@ function upgradeState(saved) {
   saved.coins ??= 0;
   saved.streak ||= 1;
   saved.daily ||= seedDaily();
+  saved.loginRecords ||= [];
   saved.peakScore ??= 1200;
   saved.peakRecords ||= [];
+  Object.values(saved.daily).forEach((day) => {
+    day.studySeconds ??= 0;
+    day.loginCount ??= 0;
+    day.firstLogin ||= "";
+    day.lastLogin ||= "";
+  });
   saved.words.forEach((word) => {
     word.history ||= [];
     word.correct ??= 0;
@@ -67,20 +79,66 @@ function upgradeState(saved) {
     word.intervalIndex ??= 0;
     word.nextReview ||= todayKey;
     word.reviewedToday ??= false;
+    word.learned ??= word.correct > 0 || word.score > 0;
+    word.firstSeen ||= "";
   });
   return saved;
 }
 
+function dailyRecord(done = 0, wrong = 0, target = 12) {
+  return { done, wrong, target, studySeconds: 0, loginCount: 0, firstLogin: "", lastLogin: "" };
+}
+
 function seedDaily() {
-  const daily = { [todayKey]: { done: 0, wrong: 0, target: 12 } };
+  const daily = { [todayKey]: dailyRecord(0, 0, 12) };
   for (let i = 1; i <= 6; i += 1) {
-    daily[offsetDate(-i)] = { done: Math.max(0, 10 - i), wrong: Math.max(0, Math.floor(i / 2)), target: 12 };
+    daily[offsetDate(-i)] = dailyRecord(Math.max(0, 10 - i), Math.max(0, Math.floor(i / 2)), 12);
   }
   return daily;
 }
 
 function saveState() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function timeLabel(date = new Date()) {
+  return date.toTimeString().slice(0, 5);
+}
+
+function clientRegion(role = "student") {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
+  const language = navigator.language || "unknown";
+  const region = role === "admin" ? "北京管理员端" : "深圳学生端";
+  return { region, timezone, language };
+}
+
+function recordLogin(role = "student") {
+  ensureToday();
+  const today = state.daily[todayKey];
+  const now = timeLabel();
+  const regionInfo = clientRegion(role);
+  today.loginCount += 1;
+  today.firstLogin ||= now;
+  today.lastLogin = now;
+  state.loginRecords.unshift({ date: todayKey, time: now, role, ...regionInfo });
+  state.loginRecords = state.loginRecords.slice(0, 60);
+  saveState();
+}
+
+function syncStudyDuration(force = false) {
+  ensureToday();
+  const now = Date.now();
+  const delta = Math.max(0, Math.floor((now - lastDurationSync) / 1000));
+  if (!force && delta < 15) return;
+  state.daily[todayKey].studySeconds += Math.min(delta, 300);
+  lastDurationSync = now;
+  saveState();
+}
+
+function formatDuration(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 1) return `${seconds}秒`;
+  return `${minutes}分`;
 }
 
 function offsetDate(days) {
@@ -90,7 +148,7 @@ function offsetDate(days) {
 }
 
 function ensureToday() {
-  if (!state.daily[todayKey]) state.daily[todayKey] = { done: 0, wrong: 0, target: 12 };
+  if (!state.daily[todayKey]) state.daily[todayKey] = dailyRecord(0, 0, 12);
   if (state.lastStudyDate !== todayKey) {
     const yesterday = offsetDate(-1);
     state.streak = state.lastStudyDate === yesterday ? state.streak + 1 : 1;
@@ -183,13 +241,17 @@ function showNextWord() {
 
   const word = WORDS[currentWordId];
   const progress = state.words[currentWordId];
+  const isNewWord = !progress.learned;
   el("wordLevel").textContent = word.level;
-  el("wordStatus").textContent = `掌握 ${progress.score}% · 错 ${progress.wrong} 次`;
+  el("wordStatus").textContent = isNewWord ? "新词 · 先学习" : `复习 · 掌握 ${progress.score}% · 错 ${progress.wrong} 次`;
   el("wordText").textContent = word.word;
   el("wordPhonetic").textContent = word.phonetic || "音标未提供";
-  el("wordMeaning").textContent = "先遮住中文，在心里回忆 3 秒。";
-  el("wordExample").textContent = "想不起也没关系，点“看答案”后诚实选择。";
-  el("todayAdvice").textContent = progress.wrong > 0 ? "这张是薄弱词，今天优先补上。" : "先回忆，再确认答案。";
+  el("wordMeaning").textContent = isNewWord ? word.meaning : "先遮住中文，在心里回忆 3 秒。";
+  el("wordExample").textContent = isNewWord ? word.example : "想不起也没关系，点“看答案”后诚实选择。";
+  el("showAnswerButton").textContent = isNewWord ? "查看例句" : "看答案";
+  el("knownButton").textContent = isNewWord ? "学会了" : "认识";
+  el("forgotButton").textContent = isNewWord ? "还要再看" : "忘了";
+  el("todayAdvice").textContent = isNewWord ? "这是新词，先看意思和例句，再点“学会了”。" : progress.wrong > 0 ? "这张是薄弱词，今天优先补上。" : "复习词先回忆，再确认答案。";
   renderAll();
 }
 
@@ -213,12 +275,21 @@ function gradeCurrent(known) {
   progress.reviewedToday = true;
   progress.history.push({ date: todayKey, known });
 
+  const wasNewWord = !progress.learned;
+  progress.learned = true;
+  progress.firstSeen ||= todayKey;
+
   if (known) {
     progress.correct += 1;
-    progress.score = Math.min(100, progress.score + (answerVisible ? 20 : 12));
+    progress.score = Math.min(100, progress.score + (wasNewWord ? 35 : answerVisible ? 20 : 12));
     progress.intervalIndex = Math.min(intervals.length - 1, progress.intervalIndex + 1);
-    state.coins += 3;
-    showToast("认识，金币 +3");
+    state.coins += wasNewWord ? 2 : 3;
+    showToast(wasNewWord ? "新词已学会，明天复习" : "认识，金币 +3");
+  } else if (wasNewWord) {
+    progress.score = Math.max(10, progress.score);
+    progress.intervalIndex = 0;
+    progress.nextReview = todayKey;
+    showToast("新词保留，稍后再看一遍");
   } else {
     progress.wrong += 1;
     progress.score = Math.max(0, progress.score - 18);
@@ -229,7 +300,8 @@ function gradeCurrent(known) {
   }
 
   state.daily[todayKey].done += 1;
-  progress.nextReview = offsetDate(intervals[progress.intervalIndex]);
+  syncStudyDuration(true);
+  if (!(wasNewWord && !known)) progress.nextReview = offsetDate(intervals[progress.intervalIndex]);
   saveState();
   showNextWord();
 }
@@ -242,6 +314,7 @@ function renderAll() {
   renderQuestMap();
   renderCurve();
   renderPeak();
+  renderReview();
   renderAdmin();
   renderSettings();
 }
@@ -325,6 +398,48 @@ function renderCurve() {
   `).join("");
 }
 
+function unitNameFromLevel(level) {
+  const match = String(level || "").match(/(\d[A-B] Unit \d+)/);
+  return match ? match[1] : "未分单元";
+}
+
+function reviewGroups() {
+  const groups = new Map();
+  WORDS.forEach((word, index) => {
+    const unit = unitNameFromLevel(word.level);
+    if (!groups.has(unit)) groups.set(unit, []);
+    groups.get(unit).push({ word, progress: state.words[index], index });
+  });
+  return [...groups.entries()];
+}
+
+function renderReview() {
+  const groups = reviewGroups();
+  selectedReviewUnit ||= groups[0]?.[0] || "";
+  el("unitReview").innerHTML = groups.map(([unit, items]) => {
+    const learned = items.filter((item) => item.progress.learned).length;
+    const mastered = items.filter((item) => item.progress.score >= 85).length;
+    const weak = items.filter((item) => item.progress.wrong > 0 || (item.progress.learned && item.progress.score < 60)).length;
+    const active = unit === selectedReviewUnit ? "is-active" : "";
+    return `<button class="unit-card ${active}" data-unit="${unit}"><strong>${unit}</strong><span>${learned}/${items.length} 已背 · ${mastered} 掌握 · ${weak} 薄弱</span></button>`;
+  }).join("");
+  document.querySelectorAll("[data-unit]").forEach((button) => button.addEventListener("click", () => {
+    selectedReviewUnit = button.dataset.unit;
+    renderReview();
+  }));
+  renderReviewWords(groups);
+}
+
+function renderReviewWords(groups = reviewGroups()) {
+  const items = groups.find(([unit]) => unit === selectedReviewUnit)?.[1] || [];
+  el("reviewUnitPill").textContent = selectedReviewUnit || "选择单元";
+  el("reviewWordTable").innerHTML = items.map(({ word, progress }) => {
+    const status = progress.score >= 85 ? "已掌握" : progress.learned ? "已背" : "未背";
+    const cls = progress.score >= 85 ? "mastered" : progress.learned ? "learned" : "new";
+    return `<div class="word-row review-row ${cls}"><strong>${word.word}</strong><span>${status}</span><span>${progress.score}%</span><small>${word.meaning}</small></div>`;
+  }).join("") || "<p class='recommendations'>暂无词条。</p>";
+}
+
 function renderAdmin() {
   const unlocked = sessionStorage.getItem("vocab-admin-ok") === "1";
   el("adminLoginPanel").style.display = unlocked ? "none" : "grid";
@@ -344,6 +459,10 @@ function renderAdmin() {
   el("adminRiskCount").textContent = riskWords.length;
   el("adminDailyRate").textContent = `${Math.round(dailyDone / dailyTarget * 100)}%`;
   el("adminPeakBest").textContent = bestPeak;
+  el("adminTodayWords").textContent = state.daily[todayKey].done;
+  el("adminStudyMinutes").textContent = formatDuration(state.daily[todayKey].studySeconds);
+  el("adminLoginCount").textContent = state.daily[todayKey].loginCount;
+  el("adminLastLogin").textContent = state.daily[todayKey].lastLogin || "--";
   el("adminRankName").textContent = info.tier.name;
   el("adminRankGrid").innerHTML = [
     ["已掌握", `${info.mastered}/${TARGET_TOTAL_WORDS}`],
@@ -372,10 +491,23 @@ function renderAdmin() {
     .join("") || "<p class='recommendations'>当前没有高风险词，保持节奏。</p>";
 
   renderTrend();
+  renderRegionLogins();
   renderAdminPeakRecords();
   renderSourceStatus();
   renderImportGuide();
   renderRecommendations(riskWords.length, dailyDone, dailyTarget);
+}
+
+function renderRegionLogins() {
+  const records = state.loginRecords || [];
+  const studentCount = records.filter((record) => record.role === "student").length;
+  const adminCount = records.filter((record) => record.role === "admin").length;
+  const latest = records[0];
+  el("regionLoginTable").innerHTML = [
+    `<div class="word-row"><strong>深圳学生端</strong><span>${studentCount}次</span><span>手动角色</span></div>`,
+    `<div class="word-row"><strong>北京管理员端</strong><span>${adminCount}次</span><span>登录后记录</span></div>`,
+    latest ? `<div class="word-row"><strong>最近</strong><span>${latest.region}</span><span>${latest.time}</span><small>${latest.timezone} · ${latest.language}</small></div>` : ""
+  ].join("") + "<p class='security-note'>纯静态网页不稳定获取 IP；这里采用角色、浏览器时区和语言做隐私友好判断。</p>";
 }
 
 function renderAdminPeakRecords() {
@@ -403,7 +535,7 @@ function copyImportTemplate() {
 function renderTrend() {
   const days = Array.from({ length: 7 }, (_, index) => offsetDate(index - 6));
   el("trendChart").innerHTML = days.map((day) => {
-    const data = state.daily[day] || { done: 0, wrong: 0, target: 12 };
+    const data = state.daily[day] || dailyRecord(0, 0, 12);
     return `<div class="trend-bar-wrap"><span class="trend-bar done" style="height:${Math.max(8, data.done * 8)}px"></span><span class="trend-bar wrong" style="height:${Math.max(4, data.wrong * 12)}px"></span><small>${day.slice(5)}</small></div>`;
   }).join("");
 }
@@ -557,6 +689,7 @@ function loginAdmin() {
   const password = el("adminPassword").value;
   if (username === ADMIN_USER && password === ADMIN_PASS) {
     sessionStorage.setItem("vocab-admin-ok", "1");
+    recordLogin("admin");
     renderAll();
     showToast("管理员已登录");
     return;
@@ -588,7 +721,13 @@ el("peakKnownButton").addEventListener("click", () => gradePeak(true));
 el("peakWrongButton").addEventListener("click", () => gradePeak(false));
 el("adminLoginButton").addEventListener("click", loginAdmin);
 el("copyTemplateButton").addEventListener("click", copyImportTemplate);
+window.addEventListener("beforeunload", () => syncStudyDuration(true));
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) syncStudyDuration(true);
+  else lastDurationSync = Date.now();
+});
+setInterval(() => syncStudyDuration(), 30000);
 
 ensureToday();
-saveState();
+recordLogin();
 renderAll();
