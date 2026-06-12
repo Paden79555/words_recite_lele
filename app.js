@@ -1,6 +1,6 @@
 const WORDS = window.WORDS || [];
 const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "教材完整库", subtitle: "已导入词库", maxIndex: 9999, source: "内置词库" }];
-const STORAGE_KEY = "shenzhen-vocab-quest-state-v3";
+const STORAGE_KEY = "shenzhen-vocab-quest-state-v4";
 const TARGET_TOTAL_WORDS = WORDS.length;
 const EXAM_DATE = "2026-06-20";
 const ADMIN_USER = "panzeng";
@@ -29,7 +29,7 @@ let sessionStartedAt = Date.now();
 let lastDurationSync = Date.now();
 
 function loadState() {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || localStorage.getItem("shenzhen-vocab-quest-state-v2") || "null");
+  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
   if (saved && saved.words && saved.words.length === WORDS.length) return upgradeState(saved);
 
   return upgradeState({
@@ -223,6 +223,7 @@ function examDaysLeft() {
 }
 
 function showNextWord() {
+  syncStudyDuration(true);
   queue = buildQueue();
   const nextId = queue.find((id) => !state.words[id].reviewedToday) ?? queue[0];
   currentWordId = nextId;
@@ -315,6 +316,7 @@ function renderAll() {
   renderCurve();
   renderPeak();
   renderReview();
+  renderLearnedChallenge();
   renderAdmin();
   renderSettings();
 }
@@ -436,8 +438,25 @@ function renderReviewWords(groups = reviewGroups()) {
   el("reviewWordTable").innerHTML = items.map(({ word, progress }) => {
     const status = progress.score >= 85 ? "已掌握" : progress.learned ? "已背" : "未背";
     const cls = progress.score >= 85 ? "mastered" : progress.learned ? "learned" : "new";
-    return `<div class="word-row review-row ${cls}"><strong>${word.word}</strong><span>${status}</span><span>${progress.score}%</span><small>${word.meaning}</small></div>`;
+    const reviewCount = progress.history.length;
+    return `<div class="word-row review-row ${cls}"><strong>${word.word}</strong><span>${status}</span><span>${progress.score}%</span><small>${word.meaning}</small><small>背过 ${reviewCount} 次 · 熟悉 ${progress.correct} 次 · 不熟 ${progress.wrong} 次</small></div>`;
   }).join("") || "<p class='recommendations'>暂无词条。</p>";
+}
+
+function renderLearnedChallenge() {
+  const learned = activeWordProgress().filter((word) => word.learned).length;
+  el("learnedChallengePill").textContent = `${learned} 词可挑战`;
+  el("learnedChallengeText").textContent = learned >= 5 ? "从已背词中随机抽 10 个，专门检查熟词是否遗忘。" : "先背满 5 个词，再开启已背词闯关。";
+}
+
+function startLearnedChallenge() {
+  const pool = activeWordProgress().filter((word) => word.learned).map((word) => word.id);
+  if (pool.length < 5) return showToast("先背满 5 个词再闯关");
+  const ids = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
+  peakSession = { ids, index: 0, correct: 0, wrong: 0, streak: 0, delta: 0 };
+  switchView("learn");
+  renderPeak();
+  showToast("已背词闯关开始");
 }
 
 function renderAdmin() {
@@ -717,6 +736,7 @@ el("saveSettingsButton").addEventListener("click", saveSettings);
 el("exportReportButton").addEventListener("click", exportReport);
 el("resetDemoButton").addEventListener("click", resetDemo);
 el("startPeakButton").addEventListener("click", startPeakChallenge);
+el("startLearnedChallengeButton").addEventListener("click", startLearnedChallenge);
 el("peakKnownButton").addEventListener("click", () => gradePeak(true));
 el("peakWrongButton").addEventListener("click", () => gradePeak(false));
 el("adminLoginButton").addEventListener("click", loginAdmin);
