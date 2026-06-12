@@ -1,6 +1,6 @@
 const WORDS = window.WORDS || [];
 const WORD_PACKS = window.WORD_PACKS || [{ id: "full-sample", name: "教材完整库", subtitle: "已导入词库", maxIndex: 9999, source: "内置词库" }];
-const STORAGE_KEY = "shenzhen-vocab-quest-state-v4";
+const STORAGE_KEY = "shenzhen-vocab-quest-state-v5";
 const TARGET_TOTAL_WORDS = WORDS.length;
 const EXAM_DATE = "2026-06-20";
 const ADMIN_USER = "panzeng";
@@ -79,8 +79,8 @@ function upgradeState(saved) {
     word.intervalIndex ??= 0;
     word.nextReview ||= todayKey;
     word.reviewedToday ??= false;
-    word.learned ??= word.correct > 0 || word.score > 0;
     word.firstSeen ||= "";
+    word.learned = word.history.length > 0 || Boolean(word.firstSeen);
   });
   return saved;
 }
@@ -191,16 +191,24 @@ function queueScore(word) {
   return riskScore(word);
 }
 
+function hasStudied(word) {
+  return word.history.length > 0 || Boolean(word.firstSeen);
+}
+
+function isMastered(word) {
+  return hasStudied(word) && word.score >= 85;
+}
+
 function currentDailyDone() {
-  return activeWordProgress().filter((word) => word.reviewedToday).length;
+  return activeWordProgress().filter((word) => word.reviewedToday && hasStudied(word)).length;
 }
 
 function masteredWords() {
-  return activeWordProgress().filter((word) => word.score >= 85).length;
+  return activeWordProgress().filter(isMastered).length;
 }
 
 function globalMasteredWords() {
-  return state.words.filter((word) => word.score >= 85).length;
+  return state.words.filter(isMastered).length;
 }
 
 function rankInfo() {
@@ -362,7 +370,7 @@ function renderExam() {
 function renderPackLadder() {
   el("packLadder").innerHTML = WORD_PACKS.map((pack, index) => {
     const words = state.words.filter((word) => word.id < Math.min(pack.maxIndex, WORDS.length));
-    const mastered = words.filter((word) => word.score >= 85).length;
+    const mastered = words.filter(isMastered).length;
     const rate = words.length ? Math.round(mastered / words.length * 100) : 0;
     const active = pack.id === state.packId ? "is-active" : "";
     return `<button class="pack-card ${active}" data-pack-id="${pack.id}"><span>第${index + 1}关</span><strong>${pack.name}</strong><small>${pack.subtitle} · ${words.length}词 · ${rate}%</small></button>`;
@@ -419,9 +427,9 @@ function renderReview() {
   const groups = reviewGroups();
   selectedReviewUnit ||= groups[0]?.[0] || "";
   el("unitReview").innerHTML = groups.map(([unit, items]) => {
-    const learned = items.filter((item) => item.progress.learned).length;
-    const mastered = items.filter((item) => item.progress.score >= 85).length;
-    const weak = items.filter((item) => item.progress.wrong > 0 || (item.progress.learned && item.progress.score < 60)).length;
+    const learned = items.filter((item) => hasStudied(item.progress)).length;
+    const mastered = items.filter((item) => isMastered(item.progress)).length;
+    const weak = items.filter((item) => item.progress.wrong > 0 || (hasStudied(item.progress) && item.progress.score < 60)).length;
     const active = unit === selectedReviewUnit ? "is-active" : "";
     return `<button class="unit-card ${active}" data-unit="${unit}"><strong>${unit}</strong><span>${learned}/${items.length} 已背 · ${mastered} 掌握 · ${weak} 薄弱</span></button>`;
   }).join("");
@@ -436,21 +444,22 @@ function renderReviewWords(groups = reviewGroups()) {
   const items = groups.find(([unit]) => unit === selectedReviewUnit)?.[1] || [];
   el("reviewUnitPill").textContent = selectedReviewUnit || "选择单元";
   el("reviewWordTable").innerHTML = items.map(({ word, progress }) => {
-    const status = progress.score >= 85 ? "已掌握" : progress.learned ? "已背" : "未背";
-    const cls = progress.score >= 85 ? "mastered" : progress.learned ? "learned" : "new";
+    const studied = hasStudied(progress);
+    const status = isMastered(progress) ? "已掌握" : studied ? "已背" : "未背";
+    const cls = isMastered(progress) ? "mastered" : studied ? "learned" : "new";
     const reviewCount = progress.history.length;
     return `<div class="word-row review-row ${cls}"><strong>${word.word}</strong><span>${status}</span><span>${progress.score}%</span><small>${word.meaning}</small><small>背过 ${reviewCount} 次 · 熟悉 ${progress.correct} 次 · 不熟 ${progress.wrong} 次</small></div>`;
   }).join("") || "<p class='recommendations'>暂无词条。</p>";
 }
 
 function renderLearnedChallenge() {
-  const learned = activeWordProgress().filter((word) => word.learned).length;
+  const learned = activeWordProgress().filter(hasStudied).length;
   el("learnedChallengePill").textContent = `${learned} 词可挑战`;
   el("learnedChallengeText").textContent = learned >= 5 ? "从已背词中随机抽 10 个，专门检查熟词是否遗忘。" : "先背满 5 个词，再开启已背词闯关。";
 }
 
 function startLearnedChallenge() {
-  const pool = activeWordProgress().filter((word) => word.learned).map((word) => word.id);
+  const pool = activeWordProgress().filter(hasStudied).map((word) => word.id);
   if (pool.length < 5) return showToast("先背满 5 个词再闯关");
   const ids = pool.sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
   peakSession = { ids, index: 0, correct: 0, wrong: 0, streak: 0, delta: 0 };
@@ -493,7 +502,7 @@ function renderAdmin() {
   ].map(([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`).join("");
 
   const groups = [
-    ["已掌握", progress.filter((word) => word.score >= 85).length],
+    ["已掌握", progress.filter(isMastered).length],
     ["较熟", progress.filter((word) => word.score >= 60 && word.score < 85).length],
     ["待补", progress.filter((word) => word.score >= 30 && word.score < 60).length],
     ["高危", progress.filter((word) => word.score < 30).length]
